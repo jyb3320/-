@@ -3,19 +3,26 @@ import ContestEditorModal from './components/ContestEditorModal';
 import ContestTable from './components/ContestTable';
 import StatsBar from './components/StatsBar';
 import { hasSupabaseConfig } from './lib/supabaseClient';
-import { createContest, deleteContest, fetchContests, updateContest } from './services/contestService';
+import { createContest, createContests, deleteContest, fetchContests, updateContest } from './services/contestService';
 import { sortContestsByDeadline } from './utils/contestUtils';
+
+const LEGACY_STORAGE_KEY = 'personal-contest-manager-table';
+const LEGACY_BACKUP_KEY = 'personal-contest-manager-table-imported';
 
 export default function App() {
   const [contests, setContests] = useState([]);
   const [editorState, setEditorState] = useState({ isOpen: false, contest: null });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [legacyContests, setLegacyContests] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
+  const [noticeMessage, setNoticeMessage] = useState('');
 
   const sortedContests = useMemo(() => sortContestsByDeadline(contests), [contests]);
 
   useEffect(() => {
+    setLegacyContests(readLegacyContests());
     loadContests();
   }, []);
 
@@ -55,6 +62,7 @@ export default function App() {
     try {
       setIsSaving(true);
       setErrorMessage('');
+      setNoticeMessage('');
 
       if (editorState.contest) {
         const updated = await updateContest(editorState.contest.id, contestInput);
@@ -79,10 +87,35 @@ export default function App() {
 
     try {
       setErrorMessage('');
+      setNoticeMessage('');
       await deleteContest(contestId);
       setContests((prev) => prev.filter((contest) => contest.id !== contestId));
     } catch (error) {
       setErrorMessage(error.message || '삭제하지 못했습니다.');
+    }
+  };
+
+  const importLegacyContests = async () => {
+    if (legacyContests.length === 0) return;
+
+    const confirmed = window.confirm(`이전 localStorage 데이터 ${legacyContests.length}개를 Supabase로 가져올까요?`);
+    if (!confirmed) return;
+
+    try {
+      setIsImporting(true);
+      setErrorMessage('');
+      setNoticeMessage('');
+
+      const imported = await createContests(legacyContests);
+      setContests((prev) => [...prev, ...imported]);
+      localStorage.setItem(LEGACY_BACKUP_KEY, JSON.stringify(legacyContests));
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      setLegacyContests([]);
+      setNoticeMessage(`이전 데이터 ${imported.length}개를 가져왔습니다.`);
+    } catch (error) {
+      setErrorMessage(error.message || '이전 데이터를 가져오지 못했습니다.');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -103,6 +136,28 @@ export default function App() {
             공모전 등록
           </button>
         </header>
+
+        {legacyContests.length > 0 && (
+          <section className="flex flex-col gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-amber-900">
+              이전 브라우저 저장 데이터 {legacyContests.length}개를 찾았습니다.
+            </p>
+            <button
+              type="button"
+              onClick={importLegacyContests}
+              disabled={isImporting}
+              className="inline-flex h-9 items-center justify-center rounded-md bg-amber-900 px-3 text-sm font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isImporting ? '가져오는 중...' : '이전 데이터 가져오기'}
+            </button>
+          </section>
+        )}
+
+        {noticeMessage && (
+          <section className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {noticeMessage}
+          </section>
+        )}
 
         {errorMessage && (
           <section className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -129,4 +184,25 @@ export default function App() {
       />
     </main>
   );
+}
+
+function readLegacyContests() {
+  try {
+    const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((contest) => ({
+        title: contest.title || '',
+        deadline: contest.deadline || '',
+        officialUrl: contest.officialUrl || contest.link || '',
+        memo: contest.memo || '',
+      }))
+      .filter((contest) => contest.title && contest.deadline && contest.officialUrl);
+  } catch {
+    return [];
+  }
 }

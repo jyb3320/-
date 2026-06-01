@@ -27,6 +27,20 @@ export async function createContest(contest) {
   return fromRow(data);
 }
 
+export async function createContests(contests) {
+  ensureSupabase();
+
+  if (contests.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .insert(contests.map(toRow))
+    .select('id, title, deadline, official_url, memo, created_at, updated_at');
+
+  if (error) throw error;
+  return data.map(fromRow);
+}
+
 export async function updateContest(id, contest) {
   ensureSupabase();
 
