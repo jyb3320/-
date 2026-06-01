@@ -1,7 +1,15 @@
 import { ExternalLink, Pencil, Trash2 } from 'lucide-react';
 import { getContestStatus, getDdayLabel } from '../utils/contestUtils';
 
-export default function ContestTable({ contests, onEdit, onDelete }) {
+export default function ContestTable({ contests, isLoading, onEdit, onDelete }) {
+  if (isLoading) {
+    return (
+      <section className="grid min-h-56 place-items-center rounded-md border border-stone-200 bg-white p-8 text-center">
+        <p className="text-sm font-medium text-stone-500">공모전 목록을 불러오는 중입니다.</p>
+      </section>
+    );
+  }
+
   if (contests.length === 0) {
     return (
       <section className="grid min-h-56 place-items-center rounded-md border border-dashed border-stone-300 bg-white p-8 text-center">

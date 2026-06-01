@@ -2,36 +2,41 @@ import { useEffect, useMemo, useState } from 'react';
 import ContestEditorModal from './components/ContestEditorModal';
 import ContestTable from './components/ContestTable';
 import StatsBar from './components/StatsBar';
-import { normalizeContest, sortContestsByDeadline } from './utils/contestUtils';
-
-const STORAGE_KEY = 'personal-contest-manager-table';
-
-const sampleContests = [
-  {
-    id: 'sample-jeongseon-video',
-    title: '2026 정선 관광 영상 공모전',
-    deadline: '2026-07-31',
-    officialUrl: 'https://example.com',
-    memo: '영상 제출 형식 확인하기',
-  },
-  {
-    id: 'sample-idea',
-    title: '생활 혁신 아이디어 공모전',
-    deadline: '2026-06-15',
-    officialUrl: 'https://example.com/idea',
-    memo: '',
-  },
-];
+import { hasSupabaseConfig } from './lib/supabaseClient';
+import { createContest, deleteContest, fetchContests, updateContest } from './services/contestService';
+import { sortContestsByDeadline } from './utils/contestUtils';
 
 export default function App() {
-  const [contests, setContests] = useState(() => readStorage(STORAGE_KEY, sampleContests).map(normalizeContest));
+  const [contests, setContests] = useState([]);
   const [editorState, setEditorState] = useState({ isOpen: false, contest: null });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(contests));
-  }, [contests]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const sortedContests = useMemo(() => sortContestsByDeadline(contests), [contests]);
+
+  useEffect(() => {
+    loadContests();
+  }, []);
+
+  const loadContests = async () => {
+    if (!hasSupabaseConfig) {
+      setErrorMessage('Supabase 환경변수가 설정되지 않았습니다.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setErrorMessage('');
+      const data = await fetchContests();
+      setContests(data);
+    } catch (error) {
+      setErrorMessage(error.message || '공모전 목록을 불러오지 못했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const openCreateModal = () => {
     setEditorState({ isOpen: true, contest: null });
@@ -42,36 +47,43 @@ export default function App() {
   };
 
   const closeModal = () => {
+    if (isSaving) return;
     setEditorState({ isOpen: false, contest: null });
   };
 
-  const saveContest = (contestInput) => {
-    if (editorState.contest) {
-      setContests((prev) =>
-        prev.map((contest) =>
-          contest.id === editorState.contest.id ? normalizeContest({ ...contest, ...contestInput }) : contest,
-        ),
-      );
-      closeModal();
-      return;
-    }
+  const saveContest = async (contestInput) => {
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
 
-    setContests((prev) => [
-      ...prev,
-      normalizeContest({
-        ...contestInput,
-        id: `contest-${Date.now()}`,
-      }),
-    ]);
-    closeModal();
+      if (editorState.contest) {
+        const updated = await updateContest(editorState.contest.id, contestInput);
+        setContests((prev) => prev.map((contest) => (contest.id === updated.id ? updated : contest)));
+      } else {
+        const created = await createContest(contestInput);
+        setContests((prev) => [...prev, created]);
+      }
+
+      setEditorState({ isOpen: false, contest: null });
+    } catch (error) {
+      setErrorMessage(error.message || '저장하지 못했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const deleteContest = (contestId) => {
+  const removeContest = async (contestId) => {
     const target = contests.find((contest) => contest.id === contestId);
     const confirmed = window.confirm(`"${target?.title || '이 공모전'}"을 삭제할까요?`);
     if (!confirmed) return;
 
-    setContests((prev) => prev.filter((contest) => contest.id !== contestId));
+    try {
+      setErrorMessage('');
+      await deleteContest(contestId);
+      setContests((prev) => prev.filter((contest) => contest.id !== contestId));
+    } catch (error) {
+      setErrorMessage(error.message || '삭제하지 못했습니다.');
+    }
   };
 
   return (
@@ -80,7 +92,7 @@ export default function App() {
         <header className="flex flex-col gap-4 border-b border-stone-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-stone-950">공모전 관리</h1>
-            <p className="mt-2 text-sm text-stone-500">마감일이 가까운 공모전부터 자동 정렬됩니다.</p>
+            <p className="mt-2 text-sm text-stone-500">팀원이 같은 공모전 목록을 함께 확인하고 관리합니다.</p>
           </div>
 
           <button
@@ -92,26 +104,29 @@ export default function App() {
           </button>
         </header>
 
+        {errorMessage && (
+          <section className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorMessage}
+          </section>
+        )}
+
         <StatsBar contests={contests} />
 
-        <ContestTable contests={sortedContests} onEdit={openEditModal} onDelete={deleteContest} />
+        <ContestTable
+          contests={sortedContests}
+          isLoading={isLoading}
+          onEdit={openEditModal}
+          onDelete={removeContest}
+        />
       </div>
 
       <ContestEditorModal
         isOpen={editorState.isOpen}
         contest={editorState.contest}
+        isSaving={isSaving}
         onClose={closeModal}
         onSave={saveContest}
       />
     </main>
   );
-}
-
-function readStorage(key, fallback) {
-  try {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : fallback;
-  } catch {
-    return fallback;
-  }
 }

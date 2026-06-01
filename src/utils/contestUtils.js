@@ -51,13 +51,3 @@ export function getContestStats(contests) {
     { total: 0, active: 0, urgent: 0, closed: 0 },
   );
 }
-
-export function normalizeContest(contest) {
-  return {
-    id: contest.id || `contest-${Date.now()}`,
-    title: contest.title || '',
-    deadline: contest.deadline || '',
-    officialUrl: contest.officialUrl || '',
-    memo: contest.memo || '',
-  };
-}

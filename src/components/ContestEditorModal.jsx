@@ -8,7 +8,7 @@ const emptyForm = {
   memo: '',
 };
 
-export default function ContestEditorModal({ isOpen, contest, onClose, onSave }) {
+export default function ContestEditorModal({ isOpen, contest, isSaving, onClose, onSave }) {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -39,7 +39,8 @@ export default function ContestEditorModal({ isOpen, contest, onClose, onSave })
           <button
             type="button"
             onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-stone-900"
+            disabled={isSaving}
+            className="grid h-8 w-8 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="닫기"
             title="닫기"
           >
@@ -84,15 +85,17 @@ export default function ContestEditorModal({ isOpen, contest, onClose, onSave })
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-9 items-center justify-center rounded-md border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+              disabled={isSaving}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               취소
             </button>
             <button
               type="submit"
-              className="inline-flex h-9 items-center justify-center rounded-md bg-stone-900 px-4 text-sm font-semibold text-white transition hover:bg-stone-700"
+              disabled={isSaving}
+              className="inline-flex h-9 items-center justify-center rounded-md bg-stone-900 px-4 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              저장
+              {isSaving ? '저장 중...' : '저장'}
             </button>
           </div>
         </form>
