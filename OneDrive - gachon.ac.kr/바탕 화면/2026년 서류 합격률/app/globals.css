@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #fbfbfa;
+  color: #1f2937;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@layer components {
+  .control {
+    @apply h-10 rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none transition focus:border-gray-400 focus:ring-2 focus:ring-gray-200;
+  }
+
+  .icon-button {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-md border border-line bg-paper text-gray-600 transition hover:bg-muted hover:text-gray-900;
+  }
+
+  .text-button {
+    @apply inline-flex h-9 items-center gap-2 rounded-md border border-line bg-paper px-3 text-sm font-medium text-gray-700 transition hover:bg-muted hover:text-gray-950;
+  }
+}
